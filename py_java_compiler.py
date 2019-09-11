@@ -12,6 +12,9 @@ class JavaGenerator(ast.NodeVisitor):
     def out(self, text: str):
         self.stream.write(str(text))
 
+    def indent(self, node: ast.AST):
+        self.out(" " * node.col_offset)
+
     def visit(self, node):
         getattr(self, "visit_"+node.__class__.__name__)(node)
 
@@ -20,9 +23,7 @@ class JavaGenerator(ast.NodeVisitor):
             self.visit(stmt)
 
     def visit_ClassDef(self, node: ast.ClassDef):
-        self.out("public class ")
-        self.out(node.name)
-        self.out(" {\n")
+        self.out(f"public class {node.name} {{\n")
         for stmt in node.body:
             self.visit(stmt)
             self.out("\n")
@@ -37,38 +38,38 @@ class JavaGenerator(ast.NodeVisitor):
         return typ_dict[name]
 
     def visit_Expr(self, node: ast.Expr):
-        self.out(" " * node.col_offset)
+        self.indent(node)
         self.visit(node.value)
         self.out(";\n")
 
     def visit_If(self, node: ast.If):
-        self.out(" " * node.col_offset)
+        self.indent(node)
         self.out("if (")
         self.visit(node.test)
         self.out(") {\n")
         for stmt in node.body:
             self.visit(stmt)
-        self.out(" " * node.col_offset)
+        self.indent(node)
         self.out("}")
         if hasattr(node, "orelse"):
             self.out(" else {\n")
             for stmt in node.orelse:
                 self.visit(stmt)
-            self.out(" " * node.col_offset)
+            self.indent(node)
             self.out("}")
         self.out("\n")
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
-
         if node.name == "__init__":
+            # TODO: Maybe search __annotations__ for the instance vars instead?
             instance_vars = [self.ann(arg.annotation.id) + " " + arg.arg for arg in node.args.args if arg.arg != "self"]
             for var in instance_vars:
-                self.out(" " * node.col_offset)
+                self.indent(node)
                 self.out(var)
                 self.out(";\n")
 
             self.out("\n")
-            self.out(" " * node.col_offset)
+            self.indent(node)
             self.out("public ")
             cls_name = next(arg.annotation.id for arg in node.args.args if arg.arg == "self")
             self.out(cls_name)
@@ -78,10 +79,10 @@ class JavaGenerator(ast.NodeVisitor):
 
             for stmt in node.body:
                 self.visit(stmt)
-            self.out(" " * node.col_offset)
+            self.indent(node)
             self.out("}\n")
         else:
-            self.out(" " * node.col_offset)
+            self.indent(node)
 
             if any((dec.id == "staticmethod" if isinstance(dec, ast.Name) else False) for dec in node.decorator_list):
                 self.out("public static ")
@@ -122,7 +123,7 @@ class JavaGenerator(ast.NodeVisitor):
                 self.visit(stmt)
 
             # print(node.col_offset)
-            self.out(" " * node.col_offset)
+            self.indent(node)
             self.out("}\n")
 
     def visit_BinOp(self, node: ast.BinOp):
@@ -201,13 +202,13 @@ class JavaGenerator(ast.NodeVisitor):
             raise NotImplementedError()
 
     def visit_Return(self, node: ast.Return):
-        self.out(" "*node.col_offset)
+        self.indent(node)
         self.out("return ")
         self.visit(node.value)
         self.out(";\n")
 
     def visit_Assign(self, node: ast.Assign):
-        self.out(" " * node.col_offset)
+        self.indent(node)
 
         target = node.targets[0]
 
@@ -230,7 +231,7 @@ class JavaGenerator(ast.NodeVisitor):
         self.out(";\n")
 
     def visit_AnnAssign(self, node: ast.AnnAssign):
-        self.out(" " * node.col_offset)
+        self.indent(node)
 
         if isinstance(node.target, ast.Name):
             self.out(self.ann(node.annotation.id) + " " + node.target.id)
